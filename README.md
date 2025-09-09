@@ -1,8 +1,7 @@
 # micropyGPS の導入ガイド
 
-このプロジェクトは GPS パースに **micropyGPS** を利用します。  
+このプロジェクトは GPS パースに [ **micropyGPS** ](https://github.com/inmcm/micropyGPS) を利用します。  
 micropyGPS は MIT License で公開されている 1 ファイル構成のライブラリです（`micropyGPS.py`）。
-[ref](https://github.com/inmcm/micropyGPS)
 
 ---
 
