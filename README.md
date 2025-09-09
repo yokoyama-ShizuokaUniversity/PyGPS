@@ -2,6 +2,7 @@
 
 このプロジェクトは GPS パースに **micropyGPS** を利用します。  
 micropyGPS は MIT License で公開されている 1 ファイル構成のライブラリです（`micropyGPS.py`）。
+[ref](https://github.com/inmcm/micropyGPS)
 
 ---
 
@@ -13,10 +14,7 @@ micropyGPS は MIT License で公開されている 1 ファイル構成のラ�
 # プロジェクト直下で
 python -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
 
 # 最新版をインストール
 pip install "git+https://github.com/inmcm/micropyGPS.git"
-
-# 特定コミットに固定（再現性が必要な場合）
-pip install "git+https://github.com/inmcm/micropyGPS.git@<commit-hash>"
+```
