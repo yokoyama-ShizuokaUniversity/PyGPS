@@ -21,12 +21,12 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --device)       DEVICE="${2:-}"; shift 2;;
-        --init-baud)    INIT_BAUD="${2:-}"; shift 2;;
-        --target-baud)  TARGET_BAUD="${2:-}"; shift 2;;
-        --update-hz)    UPDATE_HZ="${2:-}"; shift 2;;
-        --no-restart-gpsd)  RESTART_GPSD=0; shift;;
-        --dry-run)      DRY_RUN=1; shift;;
+        -d|--device)        DEVICE="${2:-}"; shift 2;;
+        -ib|--init-baud)    INIT_BAUD="${2:-}"; shift 2;;
+        -tb|--target-baud)  TARGET_BAUD="${2:-}"; shift 2;;
+        -hz|--update-hz)    UPDATE_HZ="${2:-}"; shift 2;;
+        -n|--no-restart-gpsd)  RESTART_GPSD=0; shift;;
+        -dr|--dry-run)      DRY_RUN=1; shift;;
         -h|--help)      usage; exit 0;;
         *)              echo "Unknown option: $1"; usage; exit 1;;
     esac
@@ -65,17 +65,35 @@ pmtk_line() {
     printf "\$%s*%02X\r\n" "$payload" "$cs"
 }
 
+send_updatehz_pmtk() {
+   case "$UPDATE_HZ" in
+       1)   sendline='$PMTK220,1000*1F\r\n' ;;
+       5)   sendline='$PMTK220,200*2C\r\n' ;;
+       10)  sendline='$PMTK220,100*2F\r\n' ;;
+       *)   echo "Unsupported --update-hz: $UPDATE_HZ (supported: 1,5,10)"; exit 1 ;;
+   esac
+   send_pmtk "$sendline"
+}
+
+send_baudrate_pmtk() {
+    case "$TARGET_BAUD" in
+        9600)   sendline='$PMTK251,9600*17\r\n' ;;
+        115200) sendline='$PMTK251,115200*1F\r\n' ;;
+        *)      echo "Unsupported --target-baud: $TARGET_BAUD (supported: 9600,115200)"; exit 1 ;;
+    esac
+    send_pmtk "$sendline"
+}
+
 send_pmtk() {
-    local payload="$1"
-    local line
-    line="$(pmtk_line "$payload")"
+    local sendline=$1
     if [[ "$DRY_RUN" -eq 1 ]]; then
-        printf "[DRY] -> %s" "$line"
+        printf "[DRY] -> %s" "$sendline"
     else
-        printf "%b" "$line" > "$RESOLVED"
+        printf '%b' "$sendline" > "$RESOLVED"
     fi
 }
 
+# Start Setting
 need_cmd stty
 need_cmd systemctl
 need_cmd fuser
@@ -122,21 +140,14 @@ fi
 say "Setting tty to INIT_BAUD=${INIT_BAUD}"
 stty -F "$RESOLVED" "${INIT_BAUD}" raw -echo -ixon -ixoff cs8 -cstopb -parenb
 
-case "$UPDATE_HZ" in
-    1)  PERIOD_MS=1000 ;;
-    2)  PERIOD_MS=500 ;;
-    5)  PERIOD_MS=200 ;;
-    10) PERIOD_MS=100 ;;
-    *)  echo "Unsupported --update-hz: $UPDATE_HZ (supported: 1,2,5,10)"; exit 1 ;;
-esac
-say "Sending PMTK220 (update rate -> ${UPDATE_HZ} Hz, ${PERIOD_MS} ms)"
-send_pmtk "PMTK220,${PERIOD_MS}"
-
 say "Sending PMTK251 (baud -> ${TARGET_BAUD})"
-send_pmtk "PMTK251,${TARGET_BAUD}"
+send_baudrate_pmtk
 
 say "Reconfiguring tty to TARGET_BAUD=${TARGET_BAUD}"
 stty -F "$RESOLVED" "${TARGET_BAUD}" raw -echo -ixon -ixoff cs8 -cstopb -parenb
+
+say "Sending PMTK220 (update rate -> ${UPDATE_HZ} Hz)"
+send_updatehz_pmtk
 
 say "Reading back a few lines for ACK (3s)..."
 timeout 3s head -n 20 < "$RESOLVED" || true
@@ -145,7 +156,7 @@ timeout 3s head -n 20 < "$RESOLVED" || true
 if [[ "$RESTART_GPSD" -eq 1 ]]; then
     say "Starting gpsd (socket activation)..."
     sudo systemctl enable --now gpsd.socket gpsd >/dev/null 2>&1 || \
-        sudo systemctl enable --now gpsd >2&1 || true
+        sudo systemctl enable --now gpsd 2>&1 || true
 
     say "gpsd status:"
     systemctl --no-pager --full status gpsd 2>/dev/null | sed -n '1,8p' || true
